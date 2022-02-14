@@ -1,0 +1,137 @@
+---
+# tasks file for wildlify-install
+- block:
+    - name: create user for wildfly server
+      user:
+        name: "{{ wildfly_user }}"
+        shell: /bin/false
+        comment: "Wildfly User"
+    
+    - name: unzip and install java
+      yum:
+        name: 
+          - unzip
+          - java-1.8.0-openjdk
+        state: latest
+      
+    - name: check if java is installed
+      shell:
+        cmd: rpm -q java-1.8.0-openjdk
+      register: rpm_check
+      failed_when: rpm_check.rc == 1
+
+
+
+    - name: Download wildfly 
+      unarchive:
+        src: "{{ https_uri }}"
+        dest: /
+        remote_src: yes
+      
+
+    - name: create link for /opt/wildfly
+      file:
+        src: /{{wildfly_version}}  
+        dest: /opt/wildfly
+        state: link
+    - file: 
+        path: /opt/widfly
+        owner: "{{ wildfly_user }}"
+        group: "{{ wildfly_user }}"
+        recurse: yes
+
+    - name: change owner to wildfly user
+      file:
+        path: /{{wildfly_version}}
+        owner: "{{ wildfly_user }}"
+        group: "{{ wildfly_user }}"
+        recurse: yes
+
+    - name: edit standalone.xml to run on server ip adress
+      replace:
+        path: /opt/wildfly/standalone/configuration/standalone.xml
+        backup: yes
+        regexp: '127\.0\.0\.1'
+        replace: '0.0.0.0'
+ 
+    - name: add user and password
+      shell:
+        cmd: JBOSS_HOME='/opt/wildfly' /bin/bash -c '/opt/wildfly/bin/add-user.sh -u {{mgmt_user}} -p {{mgmt_user_pass}}'
+      register: wildfly_user_status
+    - debug:
+        msg: "{{ wildfly_user_status }}"
+
+    - name: run wildfly server as a service
+      copy:
+        src: "{{ item.src }}" 
+        dest: "{{ item.dest }}"
+        owner: "{{ wildfly_user }}"
+        mode: "0744"
+        remote_src: yes
+      with_items:
+        - { src: /opt/wildfly/docs/contrib/scripts/init.d/wildfly-init-redhat.sh , dest: /etc/init.d/wildfly } 
+        - { src: /opt/wildfly/docs/contrib/scripts/init.d/wildfly.conf , dest: /etc/default } 
+
+    - name: change service file
+      replace:
+        path: /etc/default/wildfly.conf
+        regexp: "{{ item.regexp }}"
+        replace: "{{ item.replace }}"
+        backup: yes
+      with_items:  
+          - { regexp: '^# JBOSS_HOME\="\/opt\/wildfly"' , replace: 'JBOSS_HOME="/opt/wildfly"' }
+          - { regexp: '^# JBOSS_USER\=wildfly' , replace: 'JBOSS_USER=wildfly' }
+          - { regexp: '^# JBOSS_MODE\=standalone', replace: 'JBOSS_MODE=standalone' } 
+          - { regexp: '^# JBOSS_CONFIG\=standalone.xml', replace: 'JBOSS_CONFIG=standalone.xml' }
+          - { regexp: '^# STARTUP_WAIT\=60', replace: 'STARTUP_WAIT=60' } 
+          - { regexp: '^# SHUTDOWN_WAIT\=60', replace: 'SHUTDOWN_WAIT=60' } 
+
+    - name: add wildfly to init.d
+      command: "{{ item }}"
+      with_items:
+        - /usr/sbin/chkconfig --add /etc/init.d/wildfly
+        - /usr/sbin/chkconfig --level 2345 wildfly on
+        - systemctl daemon-reload
+
+    - name: start wildfly
+      systemd: 
+        name: wildfly
+        state: started
+        enabled: true
+
+    - name: check if firewalld is installed
+      shell:
+        cmd: rpm -q firewalld
+      register: firewall_check
+      ignore_errors:  true 
+      
+    - name: allow port 8080 and 9990 on firewall 
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: present  
+        immediate: true
+      loop: 
+      - "8080/tcp"
+      - "9990/tcp"  
+      when: firewall_check.rc == 0
+
+    
+    - name: deploy the app 
+      get_url:
+        url: "{{ war_download_url }}"
+        dest: "/opt/wildfly/standalone/deployments/{{deploy_war_name}}"
+        owner: "{{ wildfly_user }}"
+      
+
+    - name: check if server is up on 8080
+      uri:
+        url: http://{{  server_url }}:8080
+        return_content: true
+      ignore_errors: true 
+      register: status_8080
+  
+    - debug:
+        msg: "{{ status_8080 }}"
+
+    
