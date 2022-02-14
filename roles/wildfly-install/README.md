@@ -10,16 +10,16 @@ Requirements
 
 Role Variables
 --------------
-
-https_uri: https://download.jboss.org/wildfly/24.0.1.Final/wildfly-24.0.1.Final.zip
-wildfly_user: wildfly
-server_url: <server_url>
-wildfly_version: wildfly-24.0.1.Final
-mgmt_user: <management_username>
-mgmt_user_pass: <management_user_password> 
-war_download_url: https://github.com/vimallinuxworld13/jboss-sample-war-Dockerfile/blob/master/jboss-as-helloworld.war?raw=true
-deploy_war_name: hello-world.war
-
+'''
+- https_uri: https://download.jboss.org/wildfly/24.0.1.Final/wildfly-24.0.1.Final.zip
+- wildfly_user: wildfly
+- server_url: <server_url>
+- wildfly_version: wildfly-24.0.1.Final
+- mgmt_user: <management_username>
+- mgmt_user_pass: <management_user_password> 
+- war_download_url: https://github.com/vimallinuxworld13/jboss-sample-war-Dockerfile/blob/master/jboss-as-helloworld.war?raw=true
+- deploy_war_name: <name_with_which_to_deploy>.war
+'''
 
 Example Playbook
 ----------------
