@@ -1,3 +1,5 @@
 - hosts: widlify-server
   roles:
-    - wildfly-install
+  - role: wildfly-install
+    vars:
+      mgmt_user: {{ mgmt_user  }}
